@@ -44,36 +44,7 @@ def token_required(f):
             print(token)
         if not token:
             return jsonify({'message': 'Token is missing'}), 401
-
         try:
-            secret_key = app.config['SECRET_KEY']
-            print("here")
-            # decoded_hs256 = jwt.decode(token, secret_key, algorithms=["HS256"])
-            print("here2")
-            # decoded_hs384 = jwt.decode(token, secret_key, algorithms=["HS384"])
-            print("here3")
-            # decoded_hs512 = jwt.decode(token, secret_key, algorithms=["HS512"])
-            print("here4")
-
-            # # Asymmetric algorithms
-            # decoded_rs256 = jwt.decode(token, secret_key, algorithms=["RS256"])
-            print("here5")
-            # decoded_rs384 = jwt.decode(token, public_key, algorithms=["RS384"])
-            # decoded_rs512 = jwt.decode(token, public_key, algorithms=["RS512"])
-
-            # decoded_es256 = jwt.decode(token, public_key, algorithms=["ES256"])
-            # decoded_es384 = jwt.decode(token, public_key, algorithms=["ES384"])
-            # decoded_es512 = jwt.decode(token, public_key, algorithms=["ES512"])
-
-            # print(decoded_hs256)
-            # print(decoded_hs384)
-            # print(decoded_hs512)
-            # print(decoded_rs256)
-            # print(decoded_rs384)
-            # print(decoded_rs512)
-            # print(decoded_es256)
-            # print(decoded_es384)
-            # print(decoded_es512)
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
             print(data)
             try:
