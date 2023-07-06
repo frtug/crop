@@ -16,7 +16,8 @@ from utils import utils
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '0123456789'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///Database.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:Root1234@localhost:3306/store'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///store.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 db = SQLAlchemy(app)
 CORS(app, support_credentials=True)
@@ -26,7 +27,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     public_id = db.Column(db.String(50), unique=True)
     username = db.Column(db.String(80), unique=True)
-    password = db.Column(db.String(80))
+    password = db.Column(db.String(256))
     full_name = db.Column(db.String(80))
     state_name = db.Column(db.String(50))
     district_name = db.Column(db.String(50))
@@ -218,7 +219,7 @@ def recommendFertilizer(current_user):
     soil_category = list(dict(
         enumerate(NPKPrediction['Soil Type'].astype('category').cat.categories)).values())
     fertilizer_category = dict(
-        enumerate(NPKPrediction['Fertilizer Name'].astype('category').cat.categories))
+        enumerate(NPKPrediction['Fertilizer'].astype('category').cat.categories))
 
     soil = soil_category.index(data.get('soil'))
     crop = crop_category.index(data.get('crop'))
@@ -273,21 +274,21 @@ def recommendCropYield(current_user):
     crop = crop_category.index(crop)
 
     args = request.args
-    state = args.get("state")
-    district = args.get("district")
-    season = args.get("season")
+    state = args.get("state") # state -> Muncipality
+    district = args.get("district").title() #district -> Province
+    season = args.get("season").title()
     season = season if season else utils.getSeason()
 
     state_category = list(dict(
         enumerate(CropProduction['State_Name'].astype('category').cat.categories)).values())
     district_category = list(dict(
         enumerate(CropProduction['District_Name'].astype('category').cat.categories)).values())
-    season_category = ['Autumn', 'Kharif',
-                       'Rabi', 'Summer', 'Whole Year', 'Winter']
+    season_category = ['Dry','Wet']
 
     state = state_category.index(state)
     district = district_category.index(district)
     season = season_category.index(season)
+    print(season)
 
     cropProduction = utils.loadpickles(
         "pickledFiles/cropProduction.pkl")
@@ -391,4 +392,4 @@ def getSeasonbyMonth(current_user):
 
 
 if __name__ == "__main__":
-    app.run(debug=True,host='0.0.0.0', port=3000)
+    app.run(debug=True,host='0.0.0.0')

@@ -1,7 +1,7 @@
 ,State_Name,District_Name,Crop_Year,Season,Crop,Area,Production
 0,San Gabriel,La Union,2020,WET,Palay,2000,700
 1,San Gabriel,La Union,2020,WET,Palay,7500,3581
-2,San Gabriel,La Union,2020,DRY,Mais,2500,1654
+2,San Gabriel,La Union,2020,DRY,Maize,2500,1654
 3,San Gabriel,La Union,2020,WET,Palay,10000,3423
 4,San Gabriel,La Union,2020,DRY,Kamote,2500,484
 5,San Gabriel,La Union,2020,WET,Stringbeans,2500,135

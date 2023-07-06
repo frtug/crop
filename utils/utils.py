@@ -23,11 +23,9 @@ def loadpickles(filename):
 
 def getSeason():
     month = time.strftime("%m")
-    seasons = {'Kharif     ': ['7', '8', '9', '10'],
-               'Autumn     ': ['9', '10', '11'],
-               'Summer     ': ['3', '4', '5', '6'],
-               'Winter     ': ['12', '1', '2'],
-               'Rabi       ': ['10', '11', '12', '1', '2', '3']}
+    seasons = {'Wet     ': ['6','7', '8', '9', '10','11'],
+               'Dry     ': ['12', '1', '2','3', '4','5']
+    }
     season = ""
     for key, value in seasons.items():
         for val in value:
