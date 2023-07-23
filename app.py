@@ -14,6 +14,9 @@ from api import weatherApi
 from utils import utils
 from dotenv import load_dotenv
 import os
+# from googleapiclient.discovery import build
+# from google.oauth2 import service_account
+from scheduledEmail import schedule_send_email
 
 load_dotenv()
 
@@ -29,13 +32,19 @@ db_connection_string = f"mysql+pymysql://{db_user}:{db_password}@{db_host}:{db_p
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '0123456789'
 app.config['SQLALCHEMY_DATABASE_URI'] = db_connection_string
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:Itsmefarm123@localhost:3306/store'
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///store.db'
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 db = SQLAlchemy(app)
 CORS(app, support_credentials=True)
 
 load_dotenv()
+def create_refresh_token(user_id):
+    refresh_token_payload = {
+        'user_id': user_id,
+        'exp': datetime.utcnow() + timedelta(days=10)  # Refresh token expires in 10 days
+    }
+    refresh_token = jwt.encode(refresh_token_payload, app.config['SECRET_KEY'], algorithm='HS256')
+    return refresh_token 
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -62,30 +71,24 @@ def token_required(f):
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
             print(data)
-            try:
-                current_user = User.query.filter_by(public_id=data['public_id']).first()
-                print(current_user.username)
-            except Exception as e:
-                current_user = None
-                print(str(e))
-        except:
-            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-            print(data)
-            return jsonify({
-                'message': 'Token is invalid'
-            }), 401
-        # class User:
-        #     def __init__(self, username, password, full_name, state_name, district_name, area, soil_type, mobile):
-        #         self.username = username
-        #         self.password = password
-        #         self.full_name = full_name
-        #         self.state_name = state_name
-        #         self.district_name = district_name
-        #         self.area = area
-        #         self.soil_type = soil_type
-        #         self.mobile = mobile
-        # user = User(username="john_doe", password="pass123", full_name="John Doe", state_name="California",
-        #     district_name="Los Angeles", area="Gardening", soil_type="Loam", mobile="1234567890")
+            current_user = User.query.filter_by(public_id=data['public_id']).first()
+            print(current_user.username)
+        except jwt.exceptions.ExpiredSignatureError:
+            return make_response(jsonify({"message": "Refresh token has expired"}), 401)
+        except jwt.InvalidTokenError:
+            return make_response(jsonify({"message": "Invalid refresh token"}), 401)
+        except Exception as e:
+            return make_response(jsonify({"message": "Token is invalid"}), 401)
+
+        # except Exception as e:
+        #         current_user = None
+        #         print(str(e))
+        # except:
+        #     data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        #     print(data)
+        #     return jsonify({
+        #         'message': 'Token is invalid'
+        #     }), 401
         return f(current_user, *args, **kwargs)
 
     return decorated
@@ -98,7 +101,13 @@ def getHeathCheck():
 @app.route('/api/user', methods=['GET'])
 @token_required
 def getUserProfile(current_user):
-    return jsonify({"username": current_user.username, "password": current_user.password, "full_name": current_user.full_name, "state_name": current_user.state_name, "district_name": current_user.district_name, "area": current_user.area, "soil_type": current_user.soil_type, "mobile": current_user.mobile})
+    return make_response(
+        jsonify({"username": current_user.username, "password": current_user.password, "full_name": current_user.full_name, "state_name": current_user.state_name, "district_name": current_user.district_name, "area": current_user.area, "soil_type": current_user.soil_type, "mobile": current_user.mobile}),
+        200,
+        {'WWW-Authenticate': 'Basic realm ="User Fetched"'}
+    )
+
+
 
 
 @app.route('/api/user/update', methods=['PUT'])
@@ -122,6 +131,30 @@ def updateUserProfile(current_user):
     db.session.commit()
     return jsonify({"message": "User Profile updated successfully"})
 
+@app.route('/api/refresh', methods=['POST'])
+def refresh_token():
+    refresh_token = request.json.get('refresh_token')
+
+    try:
+        refresh_token_payload = jwt.decode(refresh_token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        user_id = refresh_token_payload['user_id']
+    except jwt.ExpiredSignatureError:
+        return make_response(jsonify({"message": "Refresh token has expired"}), 401)
+    except jwt.InvalidTokenError:
+        return make_response(jsonify({"message": "Invalid refresh token"}), 401)
+
+    # Check if the user still exists in the database (optional)
+    user = User.query.filter_by(id=user_id).first()
+    if not user:
+        return make_response(jsonify({"message": "User not found"}), 404)
+
+    # Generate a new access token
+    access_token = jwt.encode({
+        'public_id': user.public_id,
+        'exp': datetime.utcnow() + timedelta(minutes=30)  # New access token expires in 30 minutes
+    }, app.config['SECRET_KEY'], algorithm='HS256')
+
+    return jsonify({"access_token": access_token}), 200
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -148,13 +181,31 @@ def login():
             'public_id': user.public_id,
             'exp': datetime.utcnow() + timedelta(minutes=30)
         }, app.config['SECRET_KEY'])
-
-        return make_response(jsonify({"message": "Login Sucessful", 'token': str(token)}), 201)
+        refresh_token = create_refresh_token(user.id)
+        return make_response(jsonify({"message": "Login Sucessful", 'token': str(token),'refresh_token':str(refresh_token)}), 201)
     return make_response(
         jsonify({"message": "Wrong username or password"}),
         403,
         {'WWW-Authenticate': 'Basic realm ="Wrong Password !!"'}
     )
+
+@app.route('/api/scheduler',methods=['POST'])
+@token_required
+def scheduler(current_user):
+    data = request.json
+    cropInfo = data.get('data')
+    date = data.get('date')
+    recipient_email = data.get('email')
+    
+    try:
+        schedule_send_email(cropInfo,recipient_email,date)
+        return make_response(jsonify({"success": True, "message": f"Sucessfully Send Email"}), 201)
+
+    except Exception as e:
+        print('An error occurred while sending the email:', str(e))
+        return make_response(jsonify({"success": False, "message": f"Failed to Set Scheduled on {date}"}), 401)
+
+
 
 
 @app.route('/api/signup', methods=['POST'])
@@ -188,7 +239,8 @@ def recommendCrop1(current_user):
     weather = np.array(weatherApi.getWeather(district)).reshape(1, -1)
     cropRecommendationApproach1 = utils.loadpickles(
         "pickledFiles/cropRecommendationA1.pkl")
-    crop = cropRecommendationApproach1.predict(weather)
+    print(weather)
+    crop = cropRecommendationApproach1.predict(X=weather)
     return jsonify({"crop": crop[0]})
 
 
@@ -203,7 +255,7 @@ def recommendNPK(current_user):
         enumerate(NPKPrediction['label'].astype('category').cat.categories)).values())
 
     data = request.json
-    crop = category.index(data.get("crop"))
+    crop = category.index(data.get("crop").title())
 
     district = request.args.get("district")
     weather = weatherApi.getWeather(district)
@@ -247,6 +299,7 @@ def recommendFertilizer(current_user):
 
     district = request.args.get("district")
     weather = weatherApi.getWeather(district)[:2]
+    print(weather)
     fertilizerRecommendation = utils.loadpickles(
         "pickledFiles/fertilizerRecommendation.pkl")
     fertilizer_input = np.array(
@@ -294,14 +347,14 @@ def recommendCropYield(current_user):
     args = request.args
     state = args.get("state") # state -> Muncipality
     district = args.get("district").title() #district -> Province
-    season = args.get("season").title()
+    season = args.get("season").upper()
     season = season if season else utils.getSeason()
 
     state_category = list(dict(
         enumerate(CropProduction['State_Name'].astype('category').cat.categories)).values())
     district_category = list(dict(
         enumerate(CropProduction['District_Name'].astype('category').cat.categories)).values())
-    season_category = ['Dry','Wet']
+    season_category = ['DRY','WET']
 
     state = state_category.index(state)
     district = district_category.index(district)

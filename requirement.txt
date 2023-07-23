@@ -18,13 +18,18 @@ fonttools==4.40.0
 future==0.18.3
 gast==0.4.0
 geocoder==1.38.1
+google-api-core==2.11.1
+google-api-python-client==2.93.0
 google-auth==2.21.0
+google-auth-httplib2==0.1.0
 google-auth-oauthlib==1.0.0
 google-pasta==0.2.0
+googleapis-common-protos==1.59.1
 greenlet==2.0.2
 grpcio==1.56.0
 gunicorn==20.1.0
 h5py==3.9.0
+httplib2==0.22.0
 idna==3.4
 importlib-metadata==6.7.0
 importlib-resources==5.12.0
@@ -69,6 +74,7 @@ threadpoolctl==3.1.0
 tqdm==4.65.0
 typing_extensions==4.5.0
 tzdata==2023.3
+uritemplate==4.1.1
 urllib3==1.26.16
 Werkzeug==2.3.6
 wrapt==1.15.0
