@@ -1,5 +1,4 @@
 env
 .env
-data/weedDetection
 Models
 notebooks/weed Detection/Models
